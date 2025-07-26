@@ -208,7 +208,8 @@ __marimo__/
 
 # Workspace
 /workspace/
-/data/
+!/data/
+/data/*
 *test*
 .env
 .vscode/
