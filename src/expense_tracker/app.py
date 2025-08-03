@@ -11,7 +11,8 @@ from expense_tracker.main import fetch_data
 
 def format_amount_col(df: pd.DataFrame, col: str = "Amount") -> pd.DataFrame:
     """Format a specified column in the DataFrame to display as currency."""
-    df[col] = df[col].map(lambda x: f"${x:,.2f}")
+    df[col] = df[col].astype(str)
+    df[col] = df[col].map(lambda x: f"${float(x):,.2f}")
     return df
 
 
@@ -29,6 +30,7 @@ def global_tab(tab, data: pd.DataFrame):
             .sum()
             .reset_index()
             .rename(columns={"Amount": "Spending"})
+            .copy()
         )
 
         st.subheader("Monthly Spending Bar Chart")
@@ -56,7 +58,7 @@ def global_tab(tab, data: pd.DataFrame):
 def monthly_tab(data: pd.DataFrame, month: str, tab):
     month_data = data[
         pd.to_datetime(data["Date"]).dt.to_period("M").astype(str) == month
-    ]
+    ].copy()
     with tab:
         cols = st.columns(2)
         st.subheader(f"Spending Overview for {month}")
@@ -73,7 +75,11 @@ def monthly_tab(data: pd.DataFrame, month: str, tab):
         # Section with detailed spending by category
         with cols[1]:
             total_spending = (
-                month_data.groupby("Category")["Amount"].sum().to_frame().reset_index()
+                month_data.groupby("Category")["Amount"]
+                .sum()
+                .to_frame()
+                .reset_index()
+                .copy()
             )
             total_spending.loc[len(total_spending)] = [
                 "Total",
@@ -98,7 +104,29 @@ def monthly_tab(data: pd.DataFrame, month: str, tab):
 
 
 def run():
-    st.title("Monthly Spending Tracker")
+    st.set_page_config(
+        page_title="Monthly Spending Tracker",
+        page_icon=".streamlit/browser_logo.png",
+    )
+    # App header with logo next to title and introduction
+    header_cols = st.columns([1, 5])
+    with header_cols[0]:
+        st.image(".streamlit/page_logo.png", width=80)
+    with header_cols[1]:
+        st.markdown(
+            """
+            # Monthly Spending Tracker
+            """
+        )
+    st.markdown(
+        "Welcome to your personal expense dashboard! "
+        "This app helps you track and visualize your "
+        "monthly spending across all your bank accounts. "
+        "Use the tabs below to explore your global "
+        "spending overview and drill down into individual "
+        "months for detailed insights by category."
+    )
+
     fetch_data()  # Ensure latest data is processed before loading
     data = pd.read_csv(
         Path("data") / "global_aggregate.tsv", sep="\t", parse_dates=["Date"], header=0
