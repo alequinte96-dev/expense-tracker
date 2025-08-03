@@ -245,6 +245,7 @@ class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
             self.df.sort_values(by=["Date", "Description"], inplace=True)
             self.card_id = self.df["Card"].iloc[0] if not self.df.empty else 0000
             self.df["Amount"] = self.df["Amount"] * -1  # Make all amounts positive
+            self.df["Bank"] = self.bank
         return self.df
 
 
