@@ -115,6 +115,7 @@ class WellsFargoYearEndSummaryParser(CSVParser):
         data_type: Literal["YearEnd", "Statements", "AccountActivity"] = "YearEnd",
     ):
         super().__init__(csv_name, bank, data_type)
+        self.card_id = 0000
 
     def load_df(self):
         """
@@ -137,6 +138,9 @@ class WellsFargoYearEndSummaryParser(CSVParser):
                 inplace=True,
             )
             self.create_id()
+            self.card_id = self.df["Card"].iloc[0] if not self.df.empty else 0000
+            self.df["Amount"] = self.df["Amount"] * -1  # Make all amounts positive
+            self.df["Bank"] = self.bank
         return self.df
 
     def save_to_aggregate(self):
@@ -145,30 +149,32 @@ class WellsFargoYearEndSummaryParser(CSVParser):
         If the file does not exist, it will be created.
         If it exists, new data will be appended, and duplicates will be removed.
         """
+        file = self.aggregate_file
         if hasattr(self, "df") and not self.df.empty:
-            if self.aggregate_file.exists():
-                temp_df = pd.read_csv(
-                    self.aggregate_file, sep="\t", parse_dates=["Date"]
+            if file.exists():
+                temp_df = pd.read_csv(file, sep="\t", parse_dates=["Date"])
+                max_date = temp_df.loc[temp_df["Card"] == self.card_id, "Date"].max()
+                if max_date is pd.NaT:
+                    max_date = pd.Timestamp.min
+            else:
+                temp_df = pd.DataFrame(columns=self.df.columns)
+                max_date = pd.Timestamp.min
+            # Only add new data if add_new_only is True
+            if self.add_new_only == True:
+                self.df = self.df[self.df["Date"] > max_date]
+            # Remove payments, keep only transactions
+            self.df = self.df[
+                self.df["Description"].str.contains(
+                    r"\b(payment|thank you)\b", regex=True, case=False
                 )
-                max_date = temp_df["Date"].max()
-                # Olny add new data if add_new_only is True
-                if self.add_new_only == True:
-                    self.df = self.df[self.df["Date"] > max_date]
-                # Remove payments, keep only transactions
-                self.df = self.df[
-                    self.df["Description"].str.contains(
-                        r"payment", regex=True, na=False, case=False
-                    )
-                    == False
-                ]
-                # Make all amounts positive
-                self.df["Amount"] = self.df["Amount"].abs()
-                if not temp_df.empty:
-                    self.df = pd.concat([temp_df, self.df], ignore_index=True)
-                self.df.drop_duplicates(subset=["Date", "Description"], inplace=True)
+                == False
+            ]
+            # Make all amounts positive
+            self.df = pd.concat([temp_df, self.df], ignore_index=True)
+            self.df.drop_duplicates(subset=["Date", "Description"], inplace=True)
             self.df.sort_values(by=["Date", "Description"], inplace=True)
-            self.df.to_csv(self.aggregate_file, sep="\t", index=False)
-            LOGGER.info(f"Data saved to {self.aggregate_file}")
+            self.df.to_csv(file, sep="\t", index=False)
+            LOGGER.info(f"Data saved to {file}")
         else:
             LOGGER.warning("No data to save.")
 
@@ -178,6 +184,24 @@ class WellsFargoYearEndSummaryParser(CSVParser):
         This can be based on the CSV name or other criteria.
         """
         self.df["ID"] = [random_id() for _ in range(len(self.df))]
+
+    def save_to_global_aggregate(self):
+        """
+        Save the parsed DataFrame to the global aggregate file.
+        If the file does not exist, it will be created.
+        If it exists, new data will be appended, and duplicates will be removed.
+        """
+        local_data = pd.read_csv(self.aggregate_file, sep="\t", parse_dates=["Date"])
+        if self.global_aggregate_file.exists():
+            global_data = pd.read_csv(
+                self.global_aggregate_file, sep="\t", parse_dates=["Date"]
+            )
+            data = pd.concat([global_data, local_data], ignore_index=True)
+        else:
+            data = local_data
+        data.drop_duplicates(subset=["Date", "Description", "ID"], inplace=True)
+        data.sort_values(by=["Date", "Description"], inplace=True)
+        data.to_csv(self.global_aggregate_file, sep="\t", index=False)
 
 
 class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
@@ -219,6 +243,8 @@ class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
             self.create_id()
             self.df["Card"] = self.card_id
             self.df.sort_values(by=["Date", "Description"], inplace=True)
+            self.card_id = self.df["Card"].iloc[0] if not self.df.empty else 0000
+            self.df["Amount"] = self.df["Amount"] * -1  # Make all amounts positive
         return self.df
 
 

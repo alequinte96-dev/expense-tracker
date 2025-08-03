@@ -73,6 +73,7 @@ class CSVParser(ABC):
         self.bank = bank
         self.data_type = data_type
         self.data_path = data_path
+        self.global_aggregate_file = data_path / "global_aggregate.tsv"
         self.aggregate_file = data_path / self.bank / "aggregate.tsv"
         self.csv_file_path = self.data_path / self.bank / self.data_type / self.csv_name
         self.add_new_only: bool = kwargs.get("add_new_only", True)
@@ -85,6 +86,13 @@ class CSVParser(ABC):
     def save_to_aggregate(self):
         """
         Save the parsed DataFrame to the aggregate file.
+        If the file does not exist, it will be created.
+        """
+        pass
+
+    def save_to_global_aggregate(self):
+        """
+        Save the parsed DataFrame to the global aggregate file.
         If the file does not exist, it will be created.
         """
         pass

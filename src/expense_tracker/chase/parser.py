@@ -1,9 +1,7 @@
 import re
 from typing import Literal
 
-import camelot.io
 import pandas as pd
-import tabula.io
 
 from expense_tracker.utils.logger import LOGGER
 from expense_tracker.wells_fargo.parser import WellsFargoAccountSummaryParser
@@ -55,13 +53,15 @@ class ChaseAccountSummaryParser(WellsFargoAccountSummaryParser):
                 inplace=True,
             )
             self.df.sort_values(by=["Date", "Description"], inplace=True)
+            self.df["Amount"] = self.df["Amount"] * -1  # Make all amounts positive
+            self.df["Bank"] = self.bank
         return self.df
 
 
 if __name__ == "__main__":
     # Example usage of ChaseAccountSummaryParser
     parser = ChaseAccountSummaryParser(
-        csv_name="Chase3696_Activity20230719_20250719_20250719.CSV"
+        csv_name="Chase9088_Activity20230719_20250719_20250719.CSV"
     )
     df = parser.load_df()
     print(df.head())

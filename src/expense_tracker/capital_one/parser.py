@@ -38,6 +38,8 @@ class CapitalOneAccountSummaryParser(WellsFargoAccountSummaryParser):
                 )
             )
             self.df.sort_values(by=["Date", "Description"], inplace=True)
+            self.card_id = self.df["Card"].iloc[0] if not self.df.empty else 0000
+            self.df["Bank"] = self.bank
         return self.df
 
 
