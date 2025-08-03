@@ -214,6 +214,7 @@ class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
         super().__init__(csv_name, bank, data_type)
         self.columns = ["Date", "Amount", "0", "1", "Description"]
         self.get_card_id()
+        self.regex_pattern = r"(chase|capital one|wealthfront|wal-mart|wells fargo|tjx)"
 
     def get_card_id(self):
         """
@@ -221,12 +222,21 @@ class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
         This is a placeholder method and should be implemented based on actual logic.
         """
         LOGGER.debug(f"Processing CSV: {self.csv_name}")
-        match = re.search(r"journey", self.csv_name, re.IGNORECASE)
-        LOGGER.debug(f"Match found: {match}")
-        if match:
+        journey = re.search(r"journey", self.csv_name, re.IGNORECASE)
+        checking = re.search(r"checking", self.csv_name, re.IGNORECASE)
+        active = re.search(r"activecash", self.csv_name, re.IGNORECASE)
+        if journey:
             self.card_id = 9992
-        else:
+            LOGGER.debug(f"Match found: {journey.group(0)}")
+        elif active:
             self.card_id = 4031
+            LOGGER.debug(f"Match found: {active.group(0)}")
+        elif checking:
+            self.card_id = 5772
+            LOGGER.debug(f"Match found: {checking.group(0)}")
+        else:
+            self.card_id = 0000
+            LOGGER.debug("No specific card ID found, defaulting to 0000")
         LOGGER.debug(f"Card ID set to: {self.card_id}")
 
     def load_df(self):
@@ -246,12 +256,23 @@ class WellsFargoAccountSummaryParser(WellsFargoYearEndSummaryParser):
             self.card_id = self.df["Card"].iloc[0] if not self.df.empty else 0000
             self.df["Amount"] = self.df["Amount"] * -1  # Make all amounts positive
             self.df["Bank"] = self.bank
+            if self.card_id == 5772:
+                self.df.drop(
+                    index=self.df[
+                        self.df["Description"].str.contains(
+                            self.regex_pattern, case=False, regex=True
+                        )
+                    ].index,
+                    inplace=True,
+                )
         return self.df
 
 
 if __name__ == "__main__":
     # Example usage of WellsFargoAccountSummaryParser
-    parser = WellsFargoAccountSummaryParser(csv_name="11Jun2025-23July2025 Journey.csv")
+    parser = WellsFargoAccountSummaryParser(
+        csv_name="03March2025-05May2025 Checking.csv"
+    )
     df = parser.load_df()
     print(df.head())
     parser.save_to_aggregate()
