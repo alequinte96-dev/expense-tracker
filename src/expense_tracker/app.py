@@ -3,9 +3,16 @@ from pathlib import Path
 
 import altair as alt
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
 from expense_tracker.main import fetch_data
+
+
+def format_amount_col(df: pd.DataFrame, col: str = "Amount") -> pd.DataFrame:
+    """Format a specified column in the DataFrame to display as currency."""
+    df[col] = df[col].map(lambda x: f"${x:,.2f}")
+    return df
 
 
 def global_tab(tab, data: pd.DataFrame):
@@ -38,7 +45,11 @@ def global_tab(tab, data: pd.DataFrame):
         )
         st.altair_chart(chart, use_container_width=True)
         st.write("Detailed Data:")
-        st.dataframe(monthly_spending)
+        st.dataframe(
+            format_amount_col(monthly_spending, "Spending"),
+            hide_index=True,
+            use_container_width=True,
+        )
     return tab
 
 
@@ -47,10 +58,43 @@ def monthly_tab(data: pd.DataFrame, month: str, tab):
         pd.to_datetime(data["Date"]).dt.to_period("M").astype(str) == month
     ]
     with tab:
+        cols = st.columns(2)
         st.subheader(f"Spending Overview for {month}")
-        st.bar_chart(month_data.set_index("Date")["Amount"])
+        # Section with pie chart of spending by category for the month
+        with cols[0]:
+            fig = px.pie(
+                month_data,
+                names="Category",
+                values="Amount",
+                title=f"Spending Distribution for {month}",
+                labels={"Amount": "Spending ($)"},
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        # Section with detailed spending by category
+        with cols[1]:
+            total_spending = (
+                month_data.groupby("Category")["Amount"].sum().to_frame().reset_index()
+            )
+            total_spending.loc[len(total_spending)] = [
+                "Total",
+                total_spending["Amount"].sum(),
+            ]
+            st.dataframe(
+                format_amount_col(total_spending).rename(
+                    columns={"Amount": "Spending"}
+                ),
+                hide_index=True,
+                use_container_width=True,
+            )
         st.write("Detailed Data:")
-        st.dataframe(month_data.sort_values(by="Date", ascending=False))
+        monthly_data_display = format_amount_col(month_data).sort_values(
+            by="Date", ascending=False
+        )
+        st.dataframe(
+            monthly_data_display,
+            hide_index=True,
+            use_container_width=True,
+        )
 
 
 def run():
@@ -63,6 +107,7 @@ def run():
     data["Date"] = data["Date"].dt.date
     min_date = datetime(2025, 4, 1).date()
     data = data[data["Date"] >= min_date]
+    data.fillna({"Category": "Uncategorized"}, inplace=True)
     # Get all months with data
     months_with_data = (
         pd.to_datetime(data["Date"]).dt.to_period("M").unique().astype(str)
