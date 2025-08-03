@@ -1,9 +1,11 @@
+import json
+from pathlib import Path
 from typing import Literal, cast
 
 from expense_tracker.utils.logger import LOGGER
 from expense_tracker.utils.processing import ProcessingUtils, get_parser_class
 
-banks = ["CapitalOne", "Chase", "WellsFargo"]
+banks = json.load(open(Path("configs") / "banks.json"))
 
 
 def fetch_data():
