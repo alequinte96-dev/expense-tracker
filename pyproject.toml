@@ -17,6 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 dashboard = [
     "streamlit>=1.47.1",
+    "matplotlib>=3.10.5",
+    "plotly>=6.2.0",
 ]
 
 [dependency-groups]
